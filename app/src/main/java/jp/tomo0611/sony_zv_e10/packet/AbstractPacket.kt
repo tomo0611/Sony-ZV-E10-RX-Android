@@ -10,7 +10,7 @@ abstract class AbstractPacket(i: Int, enumPacketType: PacketType) {
     val mPacketType: PacketType = enumPacketType
 
     @get:CallSuper
-    val bytes: ByteBuffer
+    open val bytes: ByteBuffer
         get() {
             val allocate = ByteBuffer.allocate(this.mLength)
             allocate.order(ByteOrder.LITTLE_ENDIAN)
