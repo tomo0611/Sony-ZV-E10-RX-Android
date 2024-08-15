@@ -1,7 +1,7 @@
 package jp.tomo0611.sony_zv_e10
 
 import android.os.Bundle
-import com.google.android.material.snackbar.Snackbar
+import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.navigation.findNavController
 import androidx.navigation.ui.AppBarConfiguration
@@ -9,7 +9,13 @@ import androidx.navigation.ui.navigateUp
 import androidx.navigation.ui.setupActionBarWithNavController
 import android.view.Menu
 import android.view.MenuItem
+import android.widget.TextView
 import jp.tomo0611.sony_zv_e10.databinding.ActivityMainBinding
+import jp.tomo0611.sony_zv_e10.packet.InitCommandRequestPacket
+import java.net.InetSocketAddress
+import java.nio.ByteBuffer
+import java.nio.channels.SocketChannel
+import java.util.UUID
 
 class MainActivity : AppCompatActivity() {
 
@@ -29,9 +35,35 @@ class MainActivity : AppCompatActivity() {
         setupActionBarWithNavController(navController, appBarConfiguration)
 
         binding.fab.setOnClickListener { view ->
-            Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                .setAction("Action", null)
-                .setAnchorView(R.id.fab).show()
+            Thread{
+                val socketChannel = SocketChannel.open()
+                socketChannel.socket().tcpNoDelay = true
+                socketChannel.configureBlocking(false)
+                socketChannel.connect(InetSocketAddress("192.168.122.1", 15740))
+                // Wait for connection, avoid NotYetConnectedException
+                while (!socketChannel.finishConnect()) {
+                    Thread.sleep(100)
+                }
+                Log.d("Sony ZV-E10 Socket", "Connected")
+                socketChannel.write(InitCommandRequestPacket(UUID.randomUUID(), "Pixel 8").bytes)
+                val readBuffer = ByteBuffer.allocate(64)
+                var readBytes = socketChannel.read(readBuffer)
+                while(readBytes == 0) {
+                    Thread.sleep(100)
+                    readBytes = socketChannel.read(readBuffer)
+                }
+                Log.d("Sony ZV-E10 RX # InitCommandRequestPacket", "Read $readBytes bytes")
+                readBuffer.flip()
+                val sb = StringBuilder()
+                for (b in readBuffer.array()) {
+                    sb.append(String.format("%02X ", b))
+                }
+                Log.d("Sony ZV-E10 RX # InitCommandRequestPacket", sb.toString())
+                runOnUiThread {
+                    findViewById<TextView>(R.id.textview_first).text = sb.toString()
+                }
+                socketChannel.close()
+            }.start()
         }
     }
 
