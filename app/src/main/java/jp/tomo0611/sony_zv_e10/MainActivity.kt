@@ -11,9 +11,12 @@ import android.view.Menu
 import android.view.MenuItem
 import android.widget.TextView
 import jp.tomo0611.sony_zv_e10.databinding.ActivityMainBinding
+import jp.tomo0611.sony_zv_e10.enum.PacketType
+import jp.tomo0611.sony_zv_e10.packet.InitCommandAckPacket
 import jp.tomo0611.sony_zv_e10.packet.InitCommandRequestPacket
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.nio.channels.SocketChannel
 import java.util.UUID
 
@@ -46,18 +49,47 @@ class MainActivity : AppCompatActivity() {
                 }
                 Log.d("Sony ZV-E10 Socket", "Connected")
                 socketChannel.write(InitCommandRequestPacket(UUID.randomUUID(), "Pixel 8").bytes)
-                val readBuffer = ByteBuffer.allocate(64)
-                var readBytes = socketChannel.read(readBuffer)
-                while(readBytes == 0) {
+                val readBuffer = ByteBuffer.allocate(8)
+                readBuffer.order(ByteOrder.LITTLE_ENDIAN)
+                while(socketChannel.read(readBuffer) == 0){
                     Thread.sleep(100)
-                    readBytes = socketChannel.read(readBuffer)
                 }
-                Log.d("Sony ZV-E10 RX # InitCommandRequestPacket", "Read $readBytes bytes")
                 readBuffer.flip()
-                val sb = StringBuilder()
+                if(readBuffer.array().contentEquals(byteArrayOf(0,0,0,0,0,0,0,0))){
+                    Log.d("Sony ZV-E10 RX # InitCommandAckPacket", "Failed")
+                    return@Thread
+                }
+                var sb = StringBuilder()
                 for (b in readBuffer.array()) {
                     sb.append(String.format("%02X ", b))
                 }
+                Log.d("Sony ZV-E10 RX # InitCommandAckPacket", sb.toString())
+
+                val length = readBuffer.int
+                Log.d("Sony ZV-E10 RX # InitCommandAckPacket", "Length: $length")
+                val buffer = ByteBuffer.allocate(length-8)
+                buffer.order(ByteOrder.LITTLE_ENDIAN)
+                val type = PacketType.entries[readBuffer.int]
+                while (buffer.hasRemaining()) {
+                    socketChannel.read(buffer)
+                }
+                buffer.flip()
+                sb = StringBuilder()
+                if(type == PacketType.InitCommandAck){
+                    Log.d("Sony ZV-E10 RX # InitCommandAckPacket", "Received")
+                    val packet = InitCommandAckPacket(length, buffer)
+                    Log.d("Sony ZV-E10 RX # InitCommandAckPacket", packet.toString())
+                    for (b in readBuffer.array()) {
+                        sb.append(String.format("%02X ", b))
+                    }
+                    sb.append("\n")
+                    for (b in buffer.array()) {
+                        sb.append(String.format("%02X ", b))
+                    }
+                    sb.append("\n\n")
+                    sb.append(packet.toString())
+                }
+
                 Log.d("Sony ZV-E10 RX # InitCommandRequestPacket", sb.toString())
                 runOnUiThread {
                     findViewById<TextView>(R.id.textview_first).text = sb.toString()
