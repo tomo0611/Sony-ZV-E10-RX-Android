@@ -1,0 +1,41 @@
+package jp.tomo0611.sony_zv_e10.enum
+
+enum class ResponseCode(var mCode: Int) {
+    Undefined(8192),
+    OK(8193),
+    GeneralError(8194),
+    SessionNotOpen(8195),
+    InvalidTransactionID(8196),
+    OperationNotSupported(8197),
+    ParameterNotSupported(8198),
+    IncompleteTransfer(8199),
+    InvalidStorageID(8200),
+    InvalidObjectHandle(8201),
+    DevicePropNotSupported(8202),
+    InvalidObjectFormatCode(8203),
+    PasswordLengthOverMax(8204),
+    PasswordIncludesInvalidCharacter(8205),
+    /*PasswordLengthOverMax_B(8206),
+    PasswordIncludesInvalidCharacter(8207),*/
+    NoThumbnailPresent(8208),
+    /*PasswordIncludesInvalidCharacter(8209),
+    PasswordLengthOverMax_C(8210),
+    PasswordIncludesInvalidCharacter(8211),
+    PasswordLengthOverMax_D(8212),
+    PasswordIncludesInvalidCharacter(8213),
+    PasswordLengthOverMax_E(8214),
+    PasswordIncludesInvalidCharacter_A(8215),
+    PasswordLengthOverMax_F(8216),*/
+    DeviceBusy(8217),
+    /*PasswordLengthOverMax(8218),
+    PasswordIncludesInvalidCharacter(8219),
+    PasswordLengthOverMax(8220),*/
+    InvalidParameter(8221),
+    //PasswordLengthOverMax(8222),
+    TransactionCanceled(8223),
+    /*PasswordLengthOverMax(8224),
+    PasswordIncludesInvalidCharacter_B(41217),
+    PasswordLengthOverMax(41218),
+    PasswordIncludesInvalidCharacter_C(41219),*/
+    InvalidObjectPropValue(43011)
+}

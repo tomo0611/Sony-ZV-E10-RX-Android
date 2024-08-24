@@ -12,10 +12,18 @@ import android.view.MenuItem
 import android.widget.TextView
 import jp.tomo0611.sony_zv_e10.client.PtpIpClient
 import jp.tomo0611.sony_zv_e10.databinding.ActivityMainBinding
+import jp.tomo0611.sony_zv_e10.enum.DataPhaseInfo
+import jp.tomo0611.sony_zv_e10.enum.FunctionMode
+import jp.tomo0611.sony_zv_e10.enum.ObjectFormatCode
+import jp.tomo0611.sony_zv_e10.enum.OperationCode
 import jp.tomo0611.sony_zv_e10.enum.PacketType
+import jp.tomo0611.sony_zv_e10.packet.AbstractPacket
 import jp.tomo0611.sony_zv_e10.packet.InitCommandAckPacket
 import jp.tomo0611.sony_zv_e10.packet.InitCommandRequestPacket
+import jp.tomo0611.sony_zv_e10.packet.InitEventAckPacket
 import jp.tomo0611.sony_zv_e10.packet.InitEventRequestPacket
+import jp.tomo0611.sony_zv_e10.packet.OperationRequestPacket
+import jp.tomo0611.sony_zv_e10.packet.OperationResponsePacket
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -43,23 +51,69 @@ class MainActivity : AppCompatActivity() {
             Thread{
 
                 val str = StringBuilder()
+                var isEvent = false
+                var transactionId = 0
 
                 try {
-                    val client = PtpIpClient()
+                    var client = PtpIpClient()
                     client.connect("192.168.122.1", 15740)
                     client.sendPacket(InitCommandRequestPacket(UUID.randomUUID(), "Pixel 8"))
                     while(true) {
                         try {
-                            val packet = client.readPacket()
+                            var packet: AbstractPacket
+                            if (isEvent) {
+                                packet = client.readPacketFromEvent()
+                            } else {
+                                packet = client.readPacket()
+                            }
                             if (packet is InitCommandAckPacket) {
                                 str.append(packet.toString() + "\n")
-                                client.sendPacket(InitEventRequestPacket(packet.mConnectionNumber))
+                                client.sendPacketToEvent(InitEventRequestPacket(packet.mConnectionNumber))
+                                isEvent = true
+                            } else if (packet is InitEventAckPacket) {
+                                isEvent = false
+                                client.sendPacket(OperationRequestPacket(DataPhaseInfo.NoDataOrDataInPhase, OperationCode.SDIO_OpenSession, transactionId, intArrayOf(1, FunctionMode.CONTENTS_TRANSFER_MODE.value)))
+                            } else if(packet is OperationResponsePacket){
+                                transactionId++
+                                if(transactionId == 1){
+                                    client.sendPacket(OperationRequestPacket(DataPhaseInfo.NoDataOrDataInPhase, OperationCode.SDIO_Connect, transactionId, intArrayOf(1,0,0)))
+                                } else if(transactionId == 2){
+                                    client.sendPacket(OperationRequestPacket(DataPhaseInfo.NoDataOrDataInPhase, OperationCode.SDIO_Connect, transactionId, intArrayOf(2,0,0)))
+                                } else if(transactionId == 3){
+                                    client.sendPacket(OperationRequestPacket(DataPhaseInfo.NoDataOrDataInPhase, OperationCode.GetObjectHandles, transactionId, intArrayOf(0xf10001, 0x0, 0x10)))
+                                    //client.sendPacket(OperationRequestPacket(DataPhaseInfo.NoDataOrDataInPhase, OperationCode.SDIO_GetExtDeviceInfo, transactionId, intArrayOf(0x12c)))
+                                } else if(transactionId == 4){
+                                    client.sendPacket(OperationRequestPacket(DataPhaseInfo.NoDataOrDataInPhase, OperationCode.GetObjectPropList, transactionId, intArrayOf(0x21, 0x0, 0x0, 0x10, 0x0)))
+                                    //client.sendPacket(OperationRequestPacket(DataPhaseInfo.NoDataOrDataInPhase, OperationCode.SDIO_Connect, transactionId, intArrayOf(3,0,0)))
+                                } else if(transactionId == 5){
+                                    client.sendPacket(OperationRequestPacket(DataPhaseInfo.NoDataOrDataInPhase, OperationCode.GetObjectPropValue, transactionId, intArrayOf(0x21, 0xd8b1)))
+                                    //client.sendPacket(OperationRequestPacket(DataPhaseInfo.NoDataOrDataInPhase, OperationCode.SDIO_GetAllExtDevicePropInfo, transactionId, intArrayOf()))
+                                } else if(transactionId == 6){
+                                    break
+                                    //client.sendPacket(OperationRequestPacket(DataPhaseInfo.NoDataOrDataInPhase, OperationCode.GetDeviceInfo, transactionId, intArrayOf()))
+                                } else if(transactionId == 7){
+                                    //client.sendPacket(OperationRequestPacket(DataPhaseInfo.NoDataOrDataInPhase, OperationCode.GetObjectHandles, transactionId, intArrayOf(0xf10001, 0x0, 0x10)))
+                                    //val data = client.sendReceiveOperationRequestPacket(OperationRequestPacket(DataPhaseInfo.NoDataOrDataInPhase, OperationCode.GetStorageIDs, transactionId, intArrayOf()))
+                                    //val sb = StringBuilder()
+                                    //for (b in data) {
+                                    //    sb.append(String.format("%02X ", b))
+                                    //}
+                                    //Log.d("sendReceiveOperationRequestPacket#StorageIds", sb.toString())
+                                } else if(transactionId == 8){
+                                    client.sendPacket(OperationRequestPacket(DataPhaseInfo.NoDataOrDataInPhase, OperationCode.GetObjectPropsSupported, transactionId, intArrayOf(ObjectFormatCode.PTP_OFC_ASSOCIATION.code)))
+                                } else {
+                                    break
+                                }
+                            } else {
+                                Log.d("MainActivity", packet.toString())
+                                str.append(packet.toString() + "\n")
                             }
                         }catch (e: Exception){
                             e.printStackTrace()
                             break
                         }
                     }
+
                     client.close()
                     runOnUiThread {
                         findViewById<TextView>(R.id.textview_first).text = str.toString()
